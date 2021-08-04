@@ -63,6 +63,11 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter implements W
 			.allowedOrigins("*")
 			.allowedMethods("POST")
 			.exposedHeaders(SecurityConstants.AUTHORIZATION_HEADER);
+
+		registry.addMapping("/api/**")
+				.allowedOrigins("*")
+				.allowedMethods("GET","POST","DELETE","PUT")
+				.exposedHeaders(SecurityConstants.AUTHORIZATION_HEADER);
 		
 		logger.info("CORS setup... OK!");
 	}

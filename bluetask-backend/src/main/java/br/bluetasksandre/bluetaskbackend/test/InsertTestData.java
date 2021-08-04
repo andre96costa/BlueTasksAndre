@@ -43,13 +43,13 @@ public class InsertTestData {
         appUserRepository.save(appUser2);
 
         LocalDate baseDate = LocalDate.parse("2025-02-01");
-        Task task1 = new Task("Tarefa #1", baseDate.plusDays(1), false);
+        Task task1 = new Task("Tarefa #1 a", baseDate.plusDays(1), false);
         task1.setAppUser(appUser);
-        Task task2 = new Task("Tarefa #2", baseDate.plusDays(2), false);
+        Task task2 = new Task("Tarefa #2 b ", baseDate.plusDays(2), false);
         task2.setAppUser(appUser);
-        Task task3 = new Task("Tarefa #3", baseDate.plusDays(3), false);
+        Task task3 = new Task("Tarefa #3 c ", baseDate.plusDays(3), false);
         task3.setAppUser(appUser);
-        Task task4 = new Task("Tarefa #4", baseDate.plusDays(4), false);
+        Task task4 = new Task("Tarefa #4 d", baseDate.plusDays(4), false);
         task4.setAppUser(appUser);
         Task task5 = new Task("Tarefa #5", baseDate.plusDays(5), false);
         task5.setAppUser(appUser2);
@@ -57,7 +57,7 @@ public class InsertTestData {
         task6.setAppUser(appUser2);
         Task task7 = new Task("Tarefa #7", baseDate.plusDays(7), false);
         task7.setAppUser(appUser2);
-        Task task8 = new Task("Tarefa #8", baseDate.plusDays(8), false);
+        Task task8 = new Task("Tarefa #8 e", baseDate.plusDays(8), false);
         task8.setAppUser(appUser);
 
         taskRepository.save(task1);

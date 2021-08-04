@@ -42,7 +42,7 @@ public class BluetaskBackendApplication implements RepositoryRestConfigurer {
 	public void configureRepositoryRestConfiguration(RepositoryRestConfiguration config, CorsRegistry cors) {
 		config.exposeIdsFor(Task.class);
 		cors.addMapping("/**") //Permite acesso a qualquer URL,
-				.allowedOrigins("*") //Permite qualquer dominio externo acessar a aplicação
+				.allowedOrigins("*").allowedHeaders("*") //Permite qualquer dominio externo acessar a aplicação
 				.allowedMethods("GET", "POST", "PUT", "DELETE"); //Lista de metodos liberados
 		logger.info("Repository CORS setup");
 	}

@@ -2,7 +2,11 @@ import React, { Component } from 'react';
 import { Redirect } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import AuthService from '../api/AuthService';
 import TaskService from '../api/TaskService';
+import Spinner from './Spinner';
+import Alert from './Alert';
+import Moment from 'react-moment';
 
 class TaskListTable extends Component {
     constructor(props) {
@@ -10,7 +14,9 @@ class TaskListTable extends Component {
 
         this.state = {
             tasks: [],
-            editId: 0
+            editId: 0,
+            loadding: false,
+            alert: null,
         }
 
         this.onDeleteHandler = this.onDeleteHandler.bind(this);
@@ -23,14 +29,27 @@ class TaskListTable extends Component {
     }
 
     listTasks() {
-        this.setState({ tasks: TaskService.list() });
+        if (!AuthService.isAuthenticated()) {
+            return;
+        }
+        this.setState({ loadding: true })
+        TaskService.list(
+            tasks => this.setState({ tasks: tasks, loadding: false}),
+            error => this.setErrorState(error),
+        );
+    }
+
+    setErrorState(error){
+        this.setState({ alert: `Erro na requisição: ${error.message}`, loadding:false});
     }
 
     onDeleteHandler(id){
         if (window.confirm("Deseja excluir essa tarefa?")) {
-            TaskService.delete(id);
-            this.listTasks();
-            toast.success("Tarefa excluida", { position: toast.POSITION.BOTTOM_LEFT});   
+            TaskService.delete(id, () =>{
+                this.listTasks();
+                toast.success("Tarefa excluida", { position: toast.POSITION.BOTTOM_LEFT});   
+            }, 
+            error => this.setErrorState(error));
         }
     }
 
@@ -40,17 +59,39 @@ class TaskListTable extends Component {
 
     onStatusChangeHandler(task){
         task.done = !task.done;
-        TaskService.save(task);
-        this.listTasks();
+        TaskService.save(
+            task,
+            (n) => {
+                const tasks = this.state.tasks.map(t => t.id !== task.id ? t : task);
+                this.setState({ tasks: tasks })
+            },
+            (error) => {
+                if (error.response) {
+                    if(error.response.status === 404){
+                        this.setState({ alert: "Tarefa não encontrada", loadding:false});
+                    }else{
+                        this.setState({alert: `Erro: ${error.response.data.error}`, loadding: false});
+                    }
+                }else{
+                    this.setState({alert: `Erro na requisição: ${error.message}`, loadding: false})
+                }
+            } 
+        );
     }
 
 
     render() {
+        if (!AuthService.isAuthenticated()) {
+            return <Redirect to="/login" />
+        }
+
         if (this.state.editId > 0) {
             return <Redirect to={`/form/${this.state.editId}`} />
         }
         return (
             <>
+                {this.state.alert != null ? <Alert message={this.state.alert} /> : ""}
+                {this.state.loadding ? <Spinner/> : 
                 <table className="table table-striped">
                     <TableHeader />
                 {this.state.tasks.length > 0 ?
@@ -63,12 +104,14 @@ class TaskListTable extends Component {
                         <EmptyTableBody/>
                 }
                 </table> 
+                }
                 <ToastContainer autoClose={1500}/>
             </>
         );
     }
 }
 
+//===============================================================================
 const TableHeader = () => {
     return (
         
@@ -93,7 +136,13 @@ const TableBody = (props) => {
                     <tr key={task.id}>
                         <td><input type="checkbox" checked={(task.done)} onChange={(event) => props.onStatusChange(task)} /></td>
                         <td>{task.done ? <s>{task.description}</s> : task.description}</td>
-                        <td>{task.done ? <s>{task.whenTodo}</s> : task.whenTodo}</td>
+                        <td>
+                            {task.done ? 
+                                <s><Moment format="DD/MM/YYYY">{task.whenTodo}</Moment></s>
+                                :
+                                <Moment format="DD/MM/YYYY">{task.whenTodo}</Moment>
+                            }
+                        </td>
                         <td>
                             <input type="button" value="Editar" className="btn btn-primary" onClick={() => props.onEdit(task.id)} />
                             &nbsp;

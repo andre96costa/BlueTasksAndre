@@ -1,6 +1,9 @@
 import React, { Component } from 'react';
 import { Redirect } from 'react-router-dom';
+import AuthService from '../api/AuthService';
 import TaskService from '../api/TaskService';
+import Alert from './Alert';
+import Spinner from './Spinner';
 
 class TaskForm extends Component {
     constructor(props) {
@@ -13,6 +16,9 @@ class TaskForm extends Component {
             },
             redirect : false,
             isAlterar: false,
+            alert: null,
+            loadding: false,
+            saving: false,
         }
         
         this.onSubmitHandler = this.onSubmitHandler.bind(this);
@@ -23,16 +29,47 @@ class TaskForm extends Component {
     componentDidMount(){
         const editId = this.props.match.params.id;
         if (editId) {
-            const task = TaskService.load(parseInt(editId));
-            this.setState({isAlterar: true});
-            this.setState({ task: task });
+            this.setState({loadding: true});
+            TaskService.load(
+                parseInt(editId), 
+                task => {
+                    this.setState({ task: task, loadding: false, isAlterar:true })        
+                }, 
+                error => {
+                    if (error.response) {
+                        if(error.response.status === 404){
+                            this.setState({ alert: "Tarefa não encontrada", loadding:false});
+                        }else{
+                            this.setState({alert: `Erro ao carregar dados: ${error.response}`, loadding: false});
+                        }
+                    }else{
+                        this.setState({alert: `Erro na requisição: ${error.message}`, loadding: false})
+                    }
+                }
+            );
         }
     }
 
     onSubmitHandler(event){
         event.preventDefault();
-        TaskService.save(this.state.task);
-        this.setState({redirect: true});
+        this.setState({ saving: true , alert: null})
+        TaskService.save(
+            this.state.task, 
+            () => {
+                this.setState({ redirect: true , saving: false });
+            },
+            (error) => {
+                if (error.response) {
+                    if(error.response.status === 404){
+                        this.setState({ alert: "Tarefa não encontrada", loadding:false});
+                    }else{
+                        this.setState({alert: `Erro: ${error.response.data.error}`, loadding: false, saving: false});
+                    }
+                }else{
+                    this.setState({alert: `Erro na requisição: ${error.message}`, loadding: false, saving: false})
+                }
+            }
+        );
     }
 
     onInputChangeHandler(event){
@@ -42,12 +79,21 @@ class TaskForm extends Component {
     }
 
     render() {
+        if (!AuthService.isAuthenticated()) {
+            return <Redirect to="/login" />
+        }
+
         if (this.state.redirect) {
             return <Redirect to="/" />
+        }
+
+        if (this.state.loadding) {
+            return <Spinner />
         }
         return (
             <div>
                 <h1>Cadastro da tarefa</h1>
+                {this.state.alert !== null ? <Alert message={this.state.alert} /> : ""}
                 <form onSubmit={this.onSubmitHandler}>
                     <div className="mb-3">
                         <label htmlFor="description" className="form-label">Descrição</label>
@@ -70,8 +116,8 @@ class TaskForm extends Component {
                             placeholder="Informe a data" 
                             onChange={this.onInputChangeHandler}     
                         />
-                    </div>
-                    <button type="submit" className="btn btn-primary">{(this.state.isAlterar) ? "Alterar" : "Cadastrar"}</button>
+                    </div> 
+                    <button type="submit" className="btn btn-primary" disabled={this.state.saving}>{(this.state.saving) ? <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> : (this.state.isAlterar) ? "Alterar" : "Cadastrar" }</button>
                     &nbsp;&nbsp;
                     <button type="button" className="btn btn-danger" onClick={() => this.setState({ redirect: true })}>Cancelar</button>
                 </form>

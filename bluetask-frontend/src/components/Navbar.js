@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import NavbarItem from './NavbarItem';
 import { APP_NAME } from '../constants';
+import AuthService from '../api/AuthService';
 
 
 class Navbar extends Component {
@@ -15,6 +16,7 @@ class Navbar extends Component {
         }
 
         this.onClickHandler = this.onClickHandler.bind(this);
+        this.onLogoutHandler = this.onLogoutHandler.bind(this);
     }
 
     onClickHandler(itemClicked) {
@@ -31,6 +33,11 @@ class Navbar extends Component {
         this.setState({ items });
     }
 
+    onLogoutHandler(){
+        AuthService.logout();
+        this.props.onLinkClick();
+    }
+
 
     render() {
         return (
@@ -45,8 +52,12 @@ class Navbar extends Component {
                             {
                                 this.state.items.map((i) => <NavbarItem key={i.name} item={i} onClick={this.onClickHandler} />)
                             }
+                            { AuthService.isAuthenticated() ? <NavbarItem onClick={this.onLogoutHandler}  item={ {name :"Logout", href: "#", active: false} } /> : "" }
                         </div>
                     </div>
+                    <span className="navbar-text">
+                            {AuthService.isAuthenticated() ? `Olá, ${AuthService.getJWTTokenData().displayName}!` : ""}
+                    </span>
                 </nav>
             </div>
         );

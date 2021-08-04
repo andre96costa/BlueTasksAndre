@@ -1,33 +1,49 @@
+import axios from "axios";
+import { API_ENDPOINT } from "../constants";
+import AuthService from "./AuthService";
+
 class TaskService {
-    constructor(){
-        this.tasks = [
-            {id: 1, description: "Tarefa 1", whenTodo: "01/01/2030", done: false},
-            {id: 2, description: "Tarefa 2", whenTodo: "02/01/2030", done: false},
-            {id: 3, description: "Tarefa 3", whenTodo: "03/01/2030", done: false},
-        ]
+
+    list(onFetch, onError){
+        axios.get(`${API_ENDPOINT}/tasks?sort=whenTodo,asc`, this.buildAuthHeader())
+            //.then(response => onFetch(response.data.content))
+            .then(response => onFetch(response.data._embedded.tasks))
+            .catch(error => onError(error));
     }
 
-    list(){
-        return this.tasks;
+    delete(id, onDelete, onError){
+        axios.delete(`${API_ENDPOINT}/tasks/${id}`, this.buildAuthHeader())
+            //.then(response => onFetch(response.data.content))
+            .then(() => onDelete())
+            .catch(error => onError(error));
     }
 
-    delete(id){
-        this.tasks = this.tasks.filter(task => (task.id === id) ? false : true);
-    }
-
-    save(task){
-        if (task.id !== 0) {
-            this.tasks = this.tasks.map(t => task.id !== t.id ? t : task);    
-        }else{
-            const arrayIds = this.tasks.map(t => t.id);
-            const taskId = Math.max(...arrayIds) + 1;
-            task.id = taskId;
-            this.tasks.push(task);
+    save(task, onSave, onError){
+       if (task.id === 0) {
+           axios.post(`${API_ENDPOINT}/tasks`, task, this.buildAuthHeader())
+                .then(() => onSave())
+                .catch(error => onError(error));
+       }
+        else{
+            axios.put(`${API_ENDPOINT}/tasks/${task.id}`, task, this.buildAuthHeader())
+                .then((n) => onSave(n))
+                .catch();
         }
     }
 
-    load(id){
-        return this.tasks.filter(t => t.id === id)[0];
+    load(id, onLoad, onError){
+        axios.get(`${API_ENDPOINT}/tasks/${id}`, this.buildAuthHeader())
+            //.then(response => onFetch(response.data.content))
+            .then(response => onLoad(response.data))
+            .catch(error => onError(error));
+    }
+
+    buildAuthHeader(){
+        return {
+            headers:{
+                'Authorization': `Bearer ${AuthService.getJWTToken()}`
+            }
+        }
     }
 
 }
