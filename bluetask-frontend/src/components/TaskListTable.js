@@ -1,168 +1,116 @@
-import React, { Component } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import "react-toastify/dist/ReactToastify.css";
 import { Redirect } from 'react-router-dom';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import AuthService from '../api/AuthService';
-import TaskService from '../api/TaskService';
 import Spinner from './Spinner';
-import Alert from './Alert';
+import Alert from './Alert'
 import Moment from 'react-moment';
+import { useTasks } from '../hooks/useTasks'
+import { AuthContext } from '../hooks/useAuth';
 
-class TaskListTable extends Component {
-    constructor(props) {
-        super(props);
+const TaskListTable = () => {
+    const auth = useContext(AuthContext);
+    const tasks = useTasks();
+    const [ editId, setEditId ] = useState(0);
 
-        this.state = {
-            tasks: [],
-            editId: 0,
-            loadding: false,
-            alert: null,
+    useEffect(() => {
+        if (auth.credentials.username !== null) {
+            tasks.list();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [auth.credentials]);
 
-        this.onDeleteHandler = this.onDeleteHandler.bind(this);
-        this.onStatusChangeHandler = this.onStatusChangeHandler.bind(this);
-        this.onEditHandler = this.onEditHandler.bind(this);
-    }
-
-    componentDidMount() {
-        this.listTasks();
-    }
-
-    listTasks() {
-        if (!AuthService.isAuthenticated()) {
-            return;
-        }
-        this.setState({ loadding: true })
-        TaskService.list(
-            tasks => this.setState({ tasks: tasks, loadding: false}),
-            error => this.setErrorState(error),
-        );
-    }
-
-    setErrorState(error){
-        this.setState({ alert: `Erro na requisição: ${error.message}`, loadding:false});
-    }
-
-    onDeleteHandler(id){
-        if (window.confirm("Deseja excluir essa tarefa?")) {
-            TaskService.delete(id, () =>{
-                this.listTasks();
-                toast.success("Tarefa excluida", { position: toast.POSITION.BOTTOM_LEFT});   
-            }, 
-            error => this.setErrorState(error));
+    const onDeleteHandler = (taskToDelete) => {
+        if (window.confirm("Deseja mesmo excluir esta tarefa?")) {
+            tasks.remove(taskToDelete);
         }
     }
 
-    onEditHandler(id){
-        this.setState({editId : id});
+    const onEditHandler = (taskToEdit) => {
+        setEditId(taskToEdit.id);
     }
 
-    onStatusChangeHandler(task){
-        task.done = !task.done;
-        TaskService.save(
-            task,
-            (n) => {
-                const tasks = this.state.tasks.map(t => t.id !== task.id ? t : task);
-                this.setState({ tasks: tasks })
-            },
-            (error) => {
-                if (error.response) {
-                    if(error.response.status === 404){
-                        this.setState({ alert: "Tarefa não encontrada", loadding:false});
-                    }else{
-                        this.setState({alert: `Erro: ${error.response.data.error}`, loadding: false});
-                    }
-                }else{
-                    this.setState({alert: `Erro na requisição: ${error.message}`, loadding: false})
-                }
-            } 
-        );
+    const onStatusChangeHandler = (taskToUpdate) => {
+        taskToUpdate.done = !taskToUpdate.done;
+        tasks.save(taskToUpdate, true);
     }
 
-
-    render() {
-        if (!AuthService.isAuthenticated()) {
-            return <Redirect to="/login" />
+    useEffect(() => {
+        if (tasks.taskRemoved !== null) {
+            toast.success(`Tarefa ${tasks.taskRemoved.id} excluída!`, 
+                { position: toast.POSITION.BOTTOM_LEFT});
+            tasks.clearTaskRemoved();
         }
 
-        if (this.state.editId > 0) {
-            return <Redirect to={`/form/${this.state.editId}`} />
+        if (tasks.taskUpdated !== null) {
+            toast.success(`Tarefa ${tasks.taskUpdated.id} foi marcada como ${!tasks.taskUpdated.done ? "não" : ""} concluída!`, 
+                { position: toast.POSITION.BOTTOM_LEFT});
+            tasks.clearTaskUpdated();
         }
-        return (
-            <>
-                {this.state.alert != null ? <Alert message={this.state.alert} /> : ""}
-                {this.state.loadding ? <Spinner/> : 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ tasks.taskRemoved, tasks.taskUpdated ]);
+
+    if (!auth.isAuthenticated()) {
+        return <Redirect to="/login" />
+    }
+
+    if (editId > 0) {
+        return <Redirect to={`/form/${editId}`} />
+    }
+
+    return (
+        <>
+            <h1>Lista de Tarefas</h1>
+            {tasks.error && <Alert message={tasks.error} />}
+            {tasks.processing ? <Spinner /> :
                 <table className="table table-striped">
-                    <TableHeader />
-                {this.state.tasks.length > 0 ?
-                        <TableBody  tasks={this.state.tasks} 
-                            onDelete={this.onDeleteHandler} 
-                            onStatusChange={this.onStatusChangeHandler}
-                            onEdit={this.onEditHandler} 
-                        />
-                        :
-                        <EmptyTableBody/>
-                }
-                </table> 
-                }
-                <ToastContainer autoClose={1500}/>
-            </>
-        );
-    }
-}
+                    <thead className="thead-dark">
+                        <tr>
+                            <th scope="col">Status</th>
+                            <th scope="col">Descrição</th>
+                            <th scope="col">Data</th>
+                            <th scope="col">Ações</th>
+                        </tr>
+                    </thead>
 
-//===============================================================================
-const TableHeader = () => {
-    return (
-        
-        <thead className="table-dark">
-                <tr>
-                <th scope="col">Status</th>
-                <th scope="col">Descrição</th>
-                <th scope="col">Data</th>
-                <th scope="col">Ações</th>
-            </tr>
-        </thead>
-       
-    );
-}
-
-
-const TableBody = (props) => {
-    return (
-        <tbody>
-            {
-                props.tasks.map(task =>
-                    <tr key={task.id}>
-                        <td><input type="checkbox" checked={(task.done)} onChange={(event) => props.onStatusChange(task)} /></td>
-                        <td>{task.done ? <s>{task.description}</s> : task.description}</td>
-                        <td>
-                            {task.done ? 
-                                <s><Moment format="DD/MM/YYYY">{task.whenTodo}</Moment></s>
-                                :
-                                <Moment format="DD/MM/YYYY">{task.whenTodo}</Moment>
-                            }
-                        </td>
-                        <td>
-                            <input type="button" value="Editar" className="btn btn-primary" onClick={() => props.onEdit(task.id)} />
-                            &nbsp;
-                            <input type="button" value="Excluir" className="btn btn-danger" onClick={() => props.onDelete(task.id)} />
-                        </td>
-                    </tr>
-                )
+                    <tbody>
+                        {tasks.taskList.length === 0 ? <tr><td colSpan="4">Sem tarefas cadastradas no momento!</td></tr> :
+                            (
+                                tasks.taskList.map(task =>
+                                    <tr key={task.id}>
+                                        <td>
+                                            <input type="checkbox"
+                                                checked={task.done}
+                                                onChange={() => onStatusChangeHandler(task)} />
+                                        </td>
+                                        <td>{task.done ? <s>{task.description}</s> : task.description}</td>
+                                        <td>{task.done ?
+                                            <s><Moment format="DD/MM/YYYY">{task.whenTodo}</Moment></s>
+                                            : <Moment format="DD/MM/YYYY">{task.whenTodo}</Moment>
+                                        }
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="button"
+                                                className="btn btn-primary"
+                                                value="Editar"
+                                                onClick={() => onEditHandler(task)} />
+                                    &nbsp;
+                                    <input
+                                                type="button"
+                                                className="btn btn-danger"
+                                                value="Excluir"
+                                                onClick={() => onDeleteHandler(task)} />
+                                        </td>
+                                    </tr>
+                                )
+                            )}
+                    </tbody>
+                </table>
             }
-        </tbody>
+            <ToastContainer autoClose={1500} />
+        </>
     );
 }
 
-const EmptyTableBody = (props) => {
-    return (
-        <tbody>
-            <tr>
-                <td colSpan="4">Sem tarefas cadastradas no momento</td>
-            </tr>
-        </tbody>
-    );
-}
 export default TaskListTable;
-

@@ -1,11 +1,8 @@
-import React from 'react';
+import React from 'react'
 
-const Alert = (props) => {
-    return(
-        <div className="alert alert-danger" role="alert">
-            {props.message}
-        </div>
-    );
-}
+const Alert = (props) =>
+    <div className="alert alert-danger" role="alert">
+        {props.message}
+    </div>
 
 export default Alert;

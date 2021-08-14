@@ -1,129 +1,98 @@
-import React, { Component } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
+import { useTasks } from '../hooks/useTasks';
 import { Redirect } from 'react-router-dom';
-import AuthService from '../api/AuthService';
-import TaskService from '../api/TaskService';
-import Alert from './Alert';
-import Spinner from './Spinner';
+import Alert from './Alert'
+import { AuthContext } from '../hooks/useAuth';
 
-class TaskForm extends Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            task: {
-                id: 0,
-                description: "",
-                whenTodo: ""
-            },
-            redirect : false,
-            isAlterar: false,
-            alert: null,
-            loadding: false,
-            saving: false,
-        }
-        
-        this.onSubmitHandler = this.onSubmitHandler.bind(this);
-        this.onInputChangeHandler = this.onInputChangeHandler.bind(this);
-        
-    }
-    
-    componentDidMount(){
-        const editId = this.props.match.params.id;
-        if (editId) {
-            this.setState({loadding: true});
-            TaskService.load(
-                parseInt(editId), 
-                task => {
-                    this.setState({ task: task, loadding: false, isAlterar:true })        
-                }, 
-                error => {
-                    if (error.response) {
-                        if(error.response.status === 404){
-                            this.setState({ alert: "Tarefa não encontrada", loadding:false});
-                        }else{
-                            this.setState({alert: `Erro ao carregar dados: ${error.response}`, loadding: false});
-                        }
-                    }else{
-                        this.setState({alert: `Erro na requisição: ${error.message}`, loadding: false})
-                    }
-                }
-            );
-        }
-    }
+const TaskForm = (props) => {
+    const auth = useContext(AuthContext);
+    const tasks = useTasks();
+    const [ task, setTask ] = useState({ id: 0, description: "", whenTodo: "" });
+    const [ redirect, setRedirect ] = useState(false);
 
-    onSubmitHandler(event){
+    useEffect(() => {
+        const editId = props.match.params.id;
+
+        if (editId && auth.credentials.username !== null) {
+            tasks.load(~~editId);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ auth.credentials ]);
+
+    useEffect(() => {
+        if (tasks.taskLoaded) {
+            setTask(tasks.taskLoaded);
+            tasks.clearTaskLoaded();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ tasks.taskLoaded ]);
+
+    const onSubmitHandler = (event) => {
         event.preventDefault();
-        this.setState({ saving: true , alert: null})
-        TaskService.save(
-            this.state.task, 
-            () => {
-                this.setState({ redirect: true , saving: false });
-            },
-            (error) => {
-                if (error.response) {
-                    if(error.response.status === 404){
-                        this.setState({ alert: "Tarefa não encontrada", loadding:false});
-                    }else{
-                        this.setState({alert: `Erro: ${error.response.data.error}`, loadding: false, saving: false});
-                    }
-                }else{
-                    this.setState({alert: `Erro na requisição: ${error.message}`, loadding: false, saving: false})
-                }
-            }
-        );
+        tasks.save(task);
     }
 
-    onInputChangeHandler(event){
+    const onInputChangeHandler = (event) => {
+        console.log("Aqui poooo ",event.target.name,event.target.value);
         const field = event.target.name;
         const value = event.target.value;
-        this.setState(prevState => ({ task: {...prevState.task, [field]: value}}));
+        setTask({ ...task, [field]: value});
     }
 
-    render() {
-        if (!AuthService.isAuthenticated()) {
-            return <Redirect to="/login" />
-        }
+    if (!auth.isAuthenticated()) {
+        return <Redirect to="/login" />
+    }
 
-        if (this.state.redirect) {
-            return <Redirect to="/" />
-        }
+    if (redirect || tasks.taskUpdated) {
+        return <Redirect to="/" />
+    }
 
-        if (this.state.loadding) {
-            return <Spinner />
-        }
-        return (
-            <div>
-                <h1>Cadastro da tarefa</h1>
-                {this.state.alert !== null ? <Alert message={this.state.alert} /> : ""}
-                <form onSubmit={this.onSubmitHandler}>
-                    <div className="mb-3">
-                        <label htmlFor="description" className="form-label">Descrição</label>
-                        <input 
-                            type="text" 
-                            className="form-control" 
-                            name="description"
-                            value={this.state.task.description} 
-                            placeholder="Digite a descrição" 
-                            onChange={this.onInputChangeHandler} 
-                        />
-                    </div>
-                    <div className="mb-3">
-                        <label htmlFor="whenTodo" className="form-label">Data</label>
-                        <input 
-                            type="date" 
-                            className="form-control" 
-                            name="whenTodo"
-                            value={this.state.task.whenTodo} 
-                            placeholder="Informe a data" 
-                            onChange={this.onInputChangeHandler}     
-                        />
-                    </div> 
-                    <button type="submit" className="btn btn-primary" disabled={this.state.saving}>{(this.state.saving) ? <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> : (this.state.isAlterar) ? "Alterar" : "Cadastrar" }</button>
+    return (
+        <div>
+            <h1>Cadastro da Tarefa</h1>
+            {tasks.error && <Alert message={tasks.error} />}
+            <form onSubmit={onSubmitHandler}>
+                <div className="form-group">
+                    <label htmlFor="description">Descrição</label>
+                    <input type="text"
+                        className="form-control"
+                        name="description"
+                        value={task.description}
+                        placeholder="Digite a descrição"
+                        onChange={onInputChangeHandler} />
+                </div>
+                <div className="form-group">
+                    <label htmlFor="whenToDo">Data</label>
+                    <input type="date"
+                        className="form-control"
+                        name="whenTodo"
+                        value={task.whenToDo}
+                        placeholder="Informe a data"
+                        onChange={onInputChangeHandler} />
+                </div>
+                <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={tasks.processing}>
+                    {
+                        tasks.processing ?
+                            <span className="spinner-border spinner-border-sm"
+                                role="status" aria-hidden="true">
+                            </span>
+                            : task.id === 0 ? "Gravar" : "Alterar"
+                    }
+                </button>
                     &nbsp;&nbsp;
-                    <button type="button" className="btn btn-danger" onClick={() => this.setState({ redirect: true })}>Cancelar</button>
-                </form>
-            </div>
-        );
-    }
+                    <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={tasks.processing}
+                    onClick={() => setRedirect(true)}>
+                    Cancelar
+                        </button>
+            </form>
+        </div>
+    );
 }
 
-export default TaskForm;    
+export default TaskForm;
